@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Missing Persons DApp</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen text-gray-800">
+  <header class="bg-blue-700 text-white py-4 shadow-md">
+    <h1 class="text-3xl font-bold text-center">Missing Persons Management System</h1>
+  </header>
+
+  <main class="max-w-4xl mx-auto py-10 px-4 space-y-10">
+    <!-- Register -->
+    <section class="bg-white p-6 rounded-xl shadow-md">
+      <h2 class="text-xl font-semibold mb-4">Register User</h2>
+      <div class="flex items-center gap-4">
+        <select id="role" class="p-2 border rounded w-full">
+          <option value="1">Admin</option>
+          <option value="2">Reporter</option>
+          <option value="3">Investigator</option>
+        </select>
+        <button onclick="registerUser()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Register</button>
+      </div>
+    </section>
+
+    <!-- Add Missing Person -->
+    <section class="bg-white p-6 rounded-xl shadow-md">
+      <h2 class="text-xl font-semibold mb-4">Add Missing Person</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <input id="name" placeholder="Name" class="p-2 border rounded" />
+        <input id="age" type="number" placeholder="Age" class="p-2 border rounded" />
+        <input id="location" placeholder="Location" class="p-2 border rounded" />
+        <input id="desc" placeholder="Description" class="p-2 border rounded" />
+      </div>
+      <button onclick="addMissingPerson()" class="mt-4 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Add Person</button>
+    </section>
+
+    <!-- Update Status -->
+    <section class="bg-white p-6 rounded-xl shadow-md">
+      <h2 class="text-xl font-semibold mb-4">Update Status (Admin)</h2>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <input id="updateId" type="number" placeholder="Person ID" class="p-2 border rounded" />
+        <select id="status" class="p-2 border rounded">
+          <option value="0">Missing</option>
+          <option value="1">Found</option>
+          <option value="2">Closed</option>
+        </select>
+        <button onclick="updateStatus()" class="bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700">Update</button>
+      </div>
+    </section>
+
+    <!-- Show Missing Persons List -->
+    <section class="bg-white p-6 rounded-xl shadow-md">
+      <h2 class="text-xl font-semibold mb-4">All Missing Persons</h2>
+      <button onclick="loadMissingPersons()" class="mb-4 bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700">Refresh List</button>
+      <div id="personList" class="space-y-4"></div>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/web3@latest/dist/web3.min.js"></script>
+  <script>
+    let contract;
+    let web3;
+    let account;
+
+    const contractAddress = "<DEPLOYED_CONTRACT_ADDRESS_HERE>";
+    const abi = <ABI_JSON_HERE>;
+
+    window.addEventListener("load", async () => {
+      if (window.ethereum) {
+        web3 = new Web3(window.ethereum);
+        await window.ethereum.request({ method: "eth_requestAccounts" });
+        const accounts = await web3.eth.getAccounts();
+        account = accounts[0];
+        contract = new web3.eth.Contract(abi, contractAddress);
+        console.log("Connected to Metamask", account);
+      } else {
+        alert("Please install Metamask!");
+      }
+    });
+
+    async function registerUser() {
+      const role = document.getElementById("role").value;
+      await contract.methods.register(role).send({ from: account });
+      alert("Registered successfully!");
+    }
+
+    async function addMissingPerson() {
+      const name = document.getElementById("name").value;
+      const age = document.getElementById("age").value;
+      const location = document.getElementById("location").value;
+      const desc = document.getElementById("desc").value;
+
+      await contract.methods
+        .addMissingPerson(name, age, location, desc)
+        .send({ from: account });
+
+      alert("Person added!");
+    }
+
+    async function updateStatus() {
+      const id = document.getElementById("updateId").value;
+      const status = document.getElementById("status").value;
+
+      try {
+        await contract.methods.updateStatus(id, status).send({ from: account });
+        alert("Status updated");
+      } catch (e) {
+        alert("Error updating status: " + e.message);
+      }
+    }
+
+    async function loadMissingPersons() {
+      const personListDiv = document.getElementById("personList");
+      personListDiv.innerHTML = "";
+      const count = await contract.methods.personCount().call();
+
+      for (let i = 1; i <= count; i++) {
+        const person = await contract.methods.missingPersons(i).call();
+        const card = document.createElement("div");
+        card.className = "bg-gray-50 p-4 rounded shadow";
+        card.innerHTML = `
+          <p><strong>ID:</strong> ${person.id}</p>
+          <p><strong>Name:</strong> ${person.name}</p>
+          <p><strong>Age:</strong> ${person.age}</p>
+          <p><strong>Location:</strong> ${person.location}</p>
+          <p><strong>Description:</strong> ${person.description}</p>
+          <p><strong>Urgency:</strong> ${person.urgency}</p>
+          <p><strong>Status:</strong> ${['Missing', 'Found', 'Closed'][person.status]}</p>
+        `;
+        personListDiv.appendChild(card);
+      }
+    }
+  </script>
+</body>
+</html>
